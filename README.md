@@ -95,5 +95,5 @@ git submodule add https://github.com/nczyw/rt-thread.git rt-thread
 ```
 - 在顶层cmake中添加,即可使用
 ```bash
-add_subdirectory("fatfs")
+add_subdirectory("rt-thread")
 ```
