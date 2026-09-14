@@ -5,7 +5,7 @@
  - `void hardware_init(void)`该函数用于初始化硬件资源,下面是初始化示例,该函数中的`SysTick_Configuration`函数也很重要,是`rt-thread`系统的tick,如果写错操作系统会无法运行,非小华单片机需要自己去rt-thread查找他们的写法,`rt_hw_us_delay`是rt-thread用到的一个函数
  - `void rt_hw_console_output(const char *str)` 该函数是`rt_kprintf`输出信息的端口,可以自己重定向到串口输出
  - `char rt_hw_console_getchar(void)`该函数是finsh输入口的函数,可以自己重定向到串口输入
- ```bash
+ ```c
  static void  SysTick_Configuration(void);
 
 void hardware_init(void)
@@ -88,6 +88,50 @@ char rt_hw_console_getchar(void)
     return ch;
 }
  ```
+- 更高效的实现finsh,利用rt-thread的信号, 没有输入时,直接阻塞
+```c
+#define CONSOLE_BUF_SIZE  512
+uint8_t  console_buf[CONSOLE_BUF_SIZE];
+uint16_t console_head = 0;
+uint16_t console_tail = 0; 
+static void UART_DEBUG_Rx_IrqIrqCallback(void) {
+    uint8_t ch = (uint8_t)USART_ReadData(UART_DEBUG_UNIT);
+    uint16_t next = (console_head + 1) % CONSOLE_BUF_SIZE;
+    if (next != console_tail) {
+        rt_bool_t was_empty = (console_head == console_tail);
+        console_buf[console_head] = ch;
+        console_head = next;
+        if (was_empty) {
+            rt_sem_release(console_sem);
+        }
+    }
+}
+
+rt_sem_t console_sem = RT_NULL;
+void finsh_init(void) {
+    console_sem = rt_sem_create("console", 0, RT_IPC_FLAG_FIFO);
+}
+
+char rt_hw_console_getchar() {
+    if(console_head == console_tail) {
+        rt_sem_take(console_sem, RT_WAITING_FOREVER);
+    }
+    char ch = console_buf[console_tail];
+    console_tail = (console_tail + 1) % CONSOLE_BUF_SIZE;
+    return ch;
+}
+
+void rt_hw_console_output(const char *str) {
+    while (*str != '\0') {
+        if(*str == '\n') {
+            while (RESET == USART_GetStatus(UART_DEBUG_UNIT, USART_FLAG_TX_EMPTY)){}
+            USART_WriteData(UART_DEBUG_UNIT, '\r'); 
+        }
+        while (RESET == USART_GetStatus(UART_DEBUG_UNIT, USART_FLAG_TX_EMPTY)){}
+        USART_WriteData(UART_DEBUG_UNIT, *str++); 
+    }
+}
+```
 ## 使用方法
 - 可以使用子模块方式管理
 ```bash
@@ -95,5 +139,10 @@ git submodule add https://github.com/nczyw/rt-thread.git rt-thread
 ```
 - 在顶层cmake中添加,即可使用
 ```bash
+# rt-thread define
+math(EXPR RT_HEAP_SIZE "400 * 1024") 
+add_compile_definitions(
+    RT_HEAP_SIZE=${RT_HEAP_SIZE}
+)
 add_subdirectory("rt-thread")
 ```

@@ -11,6 +11,9 @@
 
 #include "board.h"
 
+#ifdef RT_HEAP_SIZE
+static rt_uint8_t rt_heap[RT_HEAP_SIZE];
+#endif
 
 
 /**
@@ -48,16 +51,21 @@ void SysTick_Handler(void)
 /**
  * This function will initial HC32 board.
  */
-void rt_hw_board_init()
-{
+void rt_hw_board_init(){
+
+#if defined(RT_USING_HEAP)
+#ifdef RT_HEAP_SIZE
+    rt_system_heap_init((void *)rt_heap, (void *)(rt_heap + RT_HEAP_SIZE));
+#else
+    //rt_system_heap_init(rt_heap_begin_get(), rt_heap_end_get());
+    rt_system_heap_init((void *)HEAP_BEGIN, (void *)HEAP_END);
+#endif
+#endif
     extern void hardware_init(void);
     hardware_init();
         //
     /* Heap initialization */
-#if defined(RT_USING_HEAP)
-    //rt_system_heap_init(rt_heap_begin_get(), rt_heap_end_get());
-    rt_system_heap_init((void *)HEAP_BEGIN, (void *)HEAP_END);
-#endif
+
 
     /* Board underlying hardware initialization */
 #ifdef RT_USING_COMPONENTS_INIT
