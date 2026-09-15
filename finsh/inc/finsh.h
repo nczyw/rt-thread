@@ -11,12 +11,13 @@
 #define __FINSH_H__
 
 #include <rtdef.h>
+#include <stdint.h>
 
 #ifdef _MSC_VER
 #pragma section("FSymTab$f",read)
 #endif /* _MSC_VER */
 
-typedef long (*syscall_func)(void);
+typedef int32_t (*syscall_func)(int32_t argc, char **argv);
 #ifdef FINSH_USING_SYMTAB
 #ifdef __TI_COMPILER_VERSION__
 #define __TI_FINSH_EXPORT_FUNCTION(f)  PRAGMA(DATA_SECTION(f,"FSymTab"))
